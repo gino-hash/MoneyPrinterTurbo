@@ -19,6 +19,7 @@ if root_dir in sys.path:
     sys.path.remove(root_dir)
 sys.path.insert(0, root_dir)
 
+from app.ecozin import assets as asset_store  # noqa: E402
 from app.ecozin import bridge, db, template_loader  # noqa: E402
 from app.ecozin.generators import DraftValidationError, generate_drafts  # noqa: E402
 from app.ecozin.generators.quality_checker import severity_summary  # noqa: E402
@@ -135,9 +136,7 @@ def render_new_project() -> None:
     asset_dir = db.assets_dir(project.id)
     saved_files = []
     for up in uploads or []:
-        path = os.path.join(asset_dir, os.path.basename(up.name))
-        with open(path, "wb") as f:
-            f.write(up.getbuffer())
+        path = asset_store.save_upload(asset_dir, up.name, bytes(up.getbuffer()))
         saved_files.append(path)
         db.save_asset(SourceAsset(project_id=project.id, type="image", path_or_content=path, note=""))
     db.save_asset(SourceAsset(project_id=project.id, type="text", path_or_content=project.source_text, note="원본 텍스트"))
