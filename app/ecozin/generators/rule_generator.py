@@ -154,6 +154,39 @@ def _build_script(angle: dict[str, Any], mode: str, project: Project, audience: 
     return [p1, p2, p3, p4]
 
 
+_CLAUSE_END = re.compile(r"(?:(?<=[가-힣])(?:고|며|면|서|해|는데|지만)|(?<=[가-힣]\s)(?:뒤|후))(?=,?\s)")
+
+
+def _split_long_sentence(sentence: str, limit: int = 34) -> list[str]:
+    """자막 한 컷에 들어갈 길이로 문장을 자른다. 절 경계(…하고, …한 뒤 등)에서만 자르고, 나열 쉼표는 건드리지 않는다."""
+    sentence = sentence.strip()
+    if len(sentence) <= limit:
+        return [sentence]
+    best = None
+    for m in _CLAUSE_END.finditer(sentence):
+        cut = m.end()
+        left, right = sentence[:cut].strip(), sentence[cut:].lstrip(", ").strip()
+        if len(left) >= 8 and len(right) >= 8:
+            # 중앙에 가장 가까운 절 경계를 고른다
+            if best is None or abs(len(left) - len(sentence) / 2) < abs(len(best[0]) - len(sentence) / 2):
+                best = (left, right)
+    if not best:
+        return [sentence]
+    left, right = best
+    if left[-1] not in ".!?":
+        left += "."
+    return _split_long_sentence(left, limit) + _split_long_sentence(right, limit)
+
+
+def shorten_sentences(paragraph: str, limit: int = 34) -> str:
+    """단락 안의 긴 문장을 자막 길이로 나눈다. 쇼츠 자막은 한 컷에 30자 안팎이 읽기 편하다."""
+    sents = [x for x in re.split(r"(?<=[.!?])\s+", paragraph.strip()) if x]
+    out: list[str] = []
+    for x in sents:
+        out.extend(_split_long_sentence(x, limit))
+    return " ".join(out)
+
+
 def _trim_script(paragraphs: list[str], min_len: int = 180, max_len: int = 300) -> list[str]:
     """공백 포함 180~300자 범위로 맞춘다. 길면 2·3단락에서 문장 단위로 줄인다."""
     def total(ps):
@@ -265,6 +298,7 @@ def generate(project: Project, template: dict[str, Any], audience: dict[str, Any
         key = angle["key"]
         hook = _pick_pattern(audience["hook_patterns"][key], v)
         paragraphs = _trim_script(_build_script(angle, mode, project, audience, analysis, template, v))
+        paragraphs = [shorten_sentences(p) for p in paragraphs]
         scenes = _scene_plan(angle, template, analysis, paragraphs, hook)
         title = _pick_pattern(angle.get("title_patterns", [hook]), v) or hook[:30]
         thumb = _pick_pattern(angle.get("thumbnail_patterns", [title]), v) or title[:12]

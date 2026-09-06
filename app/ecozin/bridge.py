@@ -35,7 +35,7 @@ from app.utils import utils
 
 DEFAULT_VOICE = "ko-KR-SunHiNeural-Female"
 VOICE_CHOICES = ["ko-KR-SunHiNeural-Female", "ko-KR-InJoonNeural-Male", "ko-KR-HyunsuMultilingualNeural-Male"]
-KOREAN_FONT_CANDIDATES = ["NotoSansKR.ttf", "NotoSansKR-Bold.otf", "MicrosoftYaHeiBold.ttc"]
+KOREAN_FONT_CANDIDATES = ["NanumGothic-ExtraBold.ttf", "NanumGothic-Bold.ttf", "NotoSansKR.ttf", "MicrosoftYaHeiBold.ttc"]
 RENDER_KINDS = ("preview", "final")
 _ALLOWED_FROM = {
     "preview": {STATUS_APPROVED, STATUS_PREVIEW_READY, STATUS_SCENES_LOCKED, STATUS_FINAL_READY},
@@ -116,10 +116,10 @@ def build_video_params(draft: Draft, project: Project, assets: list[SourceAsset]
         subtitle_enabled=True,
         subtitle_position="bottom",
         font_name=korean_font(),
-        font_size=56,
+        font_size=int(config.app.get("ecozin_font_size") or 62),
         text_fore_color="#FFFFFF",
         stroke_color="#000000",
-        stroke_width=1.5,
+        stroke_width=2.2,
         n_threads=2,
         paragraph_number=1,
     )
