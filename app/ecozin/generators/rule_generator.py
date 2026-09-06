@@ -135,15 +135,17 @@ def _build_script(angle: dict[str, Any], mode: str, project: Project, audience: 
         else:
             p1 = f"{site}, 절감 장치보다 계측기를 먼저 달았습니다."
             p2 = k0 or "설치 전 기준 데이터를 먼저 확보합니다."
-            p3 = f"{k1 or '기준 데이터를 잡은 뒤 설치하고, 같은 계측기로 전후를 비교해 계측 리포트로 공개합니다.'} 절감률은 결과가 나온 뒤에 말하겠습니다."
+            p3 = k1 or "기준 데이터를 잡은 뒤 설치하고 같은 계측기로 전후를 비교해 계측 리포트로 공개합니다."
+            if len(p3) < 60:
+                p3 += " 절감률은 결과가 나온 뒤에 말하겠습니다."
     else:  # mistake
         if mode == "partner":
             p1 = f"절감기 대리점 계약 전에 꼭 확인할 {v['n']}가지{tone['tell']}."
-            p2 = "첫째, 설치 전후 계측 리포트를 제조사가 주는지. 둘째, A/S를 누가 책임지는지. 셋째, 설치 시간이 하루를 넘기는지."
+            p2 = "첫째 설치 전후 계측 리포트를 제조사가 주는지. 둘째 A/S를 누가 책임지는지. 셋째 설치 시간이 하루를 넘기는지."
             p3 = f"우리 파트너 현장 결과는 이렇습니다. {k0} {k1 or '이 세 가지가 안 되면 팔고 나서 파트너가 다 떠안게 됩니다.'}"
         else:
             p1 = f"전기절감기 고를 때 가장 많이 속는 {v['n']}가지{tone['tell']}."
-            p2 = "첫째, '절감 보장'이라는 말. 둘째, 계측 없이 견적부터 내는 곳. 셋째, 우리 설비 조건을 안 묻는 곳."
+            p2 = "첫째 '절감 보장'이라는 말. 둘째 계측 없이 견적부터 내는 곳. 셋째 우리 설비 조건을 안 묻는 곳."
             p3 = f"저희는 이렇게 합니다. {k0} {k1 or '계측 리포트 없는 절감률은 믿지 마세요.'}"
 
     # CTA 문장이 이미 요청형이면 어투 꼬리를 덧붙이지 않는다 (중복 방지)
@@ -173,8 +175,6 @@ def _split_long_sentence(sentence: str, limit: int = 34) -> list[str]:
     if not best:
         return [sentence]
     left, right = best
-    if left[-1] not in ".!?":
-        left += "."
     return _split_long_sentence(left, limit) + _split_long_sentence(right, limit)
 
 
@@ -184,11 +184,12 @@ def shorten_sentences(paragraph: str, limit: int = 34) -> str:
     out: list[str] = []
     for x in sents:
         out.extend(_split_long_sentence(x, limit))
-    return " ".join(out)
+    # 줄바꿈 = 자막 컷 경계. 마침표를 억지로 넣지 않아 음성은 자연스럽게 이어진다.
+    return "\n".join(out)
 
 
-def _trim_script(paragraphs: list[str], min_len: int = 180, max_len: int = 300) -> list[str]:
-    """공백 포함 180~300자 범위로 맞춘다. 길면 2·3단락에서 문장 단위로 줄인다."""
+def _trim_script(paragraphs: list[str], min_len: int = 110, max_len: int = 200) -> list[str]:
+    """공백 포함 110~200자(음성 1.1배로 약 25~45초)로 맞춘다. 길면 2·3단락에서 문장 단위로 줄인다."""
     def total(ps):
         return sum(len(p) for p in ps)
     ps = [p.strip() for p in paragraphs]
@@ -222,11 +223,12 @@ def _scene_plan(angle: dict[str, Any], template: dict[str, Any], analysis: Analy
                 return a
         return None
 
+    flat = [p.replace("\n", " ") for p in paragraphs]  # 장면 계획에는 자막 컷 줄바꿈을 펴서 넣는다
     role_text = {
         "hook": hook,
-        "problem": paragraphs[1] if len(paragraphs) > 1 else "",
-        "solution": paragraphs[2] if len(paragraphs) > 2 else "",
-        "cta": paragraphs[-1],
+        "problem": flat[1] if len(flat) > 1 else "",
+        "solution": flat[2] if len(flat) > 2 else "",
+        "cta": flat[-1],
     }
     for tpl in template["scene_plan_template"]:
         role = tpl["role"]

@@ -34,6 +34,7 @@ from app.services import state as sm
 from app.utils import utils
 
 DEFAULT_VOICE = "ko-KR-SunHiNeural-Female"
+DEFAULT_VOICE_RATE = 1.1
 VOICE_CHOICES = ["ko-KR-SunHiNeural-Female", "ko-KR-InJoonNeural-Male", "ko-KR-HyunsuMultilingualNeural-Male"]
 KOREAN_FONT_CANDIDATES = ["NanumGothic-ExtraBold.ttf", "NanumGothic-Bold.ttf", "NotoSansKR.ttf", "MicrosoftYaHeiBold.ttc"]
 RENDER_KINDS = ("preview", "final")
@@ -96,6 +97,10 @@ def build_video_params(draft: Draft, project: Project, assets: list[SourceAsset]
     script = str(pkg["script"]).strip()
     if not script:
         raise BridgeError("대본이 비어 있습니다.")
+    rate = float(config.app.get("ecozin_voice_rate") or DEFAULT_VOICE_RATE)
+    # 한국어 Edge TTS 는 1.0배에서 초당 약 4.5자. 사진이 반복되지 않도록 사진당 길이를 음성 길이에 맞춘다.
+    est_sec = len(script.replace("\n", "")) / (4.5 * rate)
+    clip_sec = int(min(14, max(4, round(est_sec / max(1, len(materials))) + 1)))
 
     params = VideoParams(
         video_subject=project.name,
@@ -103,14 +108,14 @@ def build_video_params(draft: Draft, project: Project, assets: list[SourceAsset]
         video_terms=None,
         video_aspect=VideoAspect.portrait.value,
         video_concat_mode=VideoConcatMode.sequential.value,
-        video_transition_mode=VideoTransitionMode.fade_in.value if kind == "final" else None,
-        video_clip_duration=5,
+        video_transition_mode=None,  # MPT 의 FadeIn 은 클립마다 검은 화면에서 시작해 깜빡임처럼 보인다
+        video_clip_duration=clip_sec,
         video_count=1,
         video_source="local",
         video_materials=materials,
         video_language="ko-KR",
         voice_name=voice_name(),
-        voice_rate=1.0,
+        voice_rate=rate,
         bgm_type="random" if kind == "final" else "",
         bgm_volume=0.15,
         subtitle_enabled=True,

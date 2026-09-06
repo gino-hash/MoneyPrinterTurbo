@@ -38,7 +38,13 @@ MPT 기본 화면의 설정에 영향을 받지 않습니다. 자동 업로드(`
 
 ```toml
 ecozin_voice_name = "ko-KR-InJoonNeural-Male"   # 기본은 ko-KR-SunHiNeural-Female
+ecozin_voice_rate = 1.1                          # 말 속도 (기본 1.1배, 쇼츠는 1.0~1.2 권장)
+ecozin_font_size = 62                            # 자막 크기 (기본 62)
 ```
+
+렌더링 규칙 (자동): 사진 1장당 길이는 음성 길이 ÷ 사진 수로 맞춰 사진이 반복되지 않게 하고,
+클립 전환 효과는 끕니다(MPT 의 FadeIn 은 클립마다 검은 화면에서 시작해 깜빡임처럼 보임).
+대본은 줄바꿈 단위로 자막 한 컷이 되므로, 대본을 직접 고칠 때도 한 줄 30자 안팎으로 나누세요.
 
 ## 사용 순서
 
@@ -56,7 +62,7 @@ python -m app.ecozin.cli run --spec docs\ecozin\examples\wtg47.json --photos C:\
 ```
 
 - `--angle`: problem | before_after | proof | mistake (실증 시작 단계면 proof 권장)
-- `--kind`: preview(음성·자막) / final(음성·자막·배경음악·전환)
+- `--kind`: preview(음성·자막) / final(음성·자막·배경음악)
 - `--voice`: 기본 ko-KR-SunHiNeural-Female, 남성은 ko-KR-InJoonNeural-Male
 - 결과 mp4 경로가 마지막 줄에 출력됩니다 (`storage/tasks/<작업id>/final-1.mp4`)
 - 초안만 보려면 `python -m app.ecozin.cli drafts --spec ...`
@@ -80,7 +86,7 @@ python -m pytest test/ecozin -q
 
 ## 아직 안 넣은 것
 
-- 프리뷰 저해상도 렌더링 (MPT 파이프라인이 해상도 옵션을 노출하지 않아 현재 프리뷰와 최종은 배경음악·전환 효과만 다름)
+- 프리뷰 저해상도 렌더링 (MPT 파이프라인이 해상도 옵션을 노출하지 않아 현재 프리뷰와 최종은 배경음악만 다름)
 - AI 생성 장면 실제 호출 (장면 계획에 "AI 생성"으로 표시만 하고, 렌더링은 업로드한 실사만 사용)
 - LLM 생성기 (규칙 기반만 있음. 같은 인터페이스로 추가 예정)
 - 업종 템플릿 2개 이상
