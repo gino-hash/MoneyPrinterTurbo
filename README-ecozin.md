@@ -47,6 +47,20 @@ ecozin_voice_name = "ko-KR-InJoonNeural-Male"   # 기본은 ko-KR-SunHiNeural-Fe
 3. 승인한 카드에서 **프리뷰 생성** → 영상 확인 → **프리뷰 확인 완료 → 장면 확정** → **최종 생성**
 4. **이력**: 프로젝트 목록(세대·초안·승인 수), 최근 이벤트 50건
 
+## 명령줄로 한 번에 (웹 화면 없이)
+
+사진 폴더와 spec JSON 만 있으면 초안 생성 → 승인 → 렌더링까지 한 명령으로 끝납니다.
+
+```bat
+python -m app.ecozin.cli run --spec docs\ecozin\examples\wtg47.json --photos C:\photos\wtg47 --angle proof --kind final
+```
+
+- `--angle`: problem | before_after | proof | mistake (실증 시작 단계면 proof 권장)
+- `--kind`: preview(음성·자막) / final(음성·자막·배경음악·전환)
+- `--voice`: 기본 ko-KR-SunHiNeural-Female, 남성은 ko-KR-InJoonNeural-Male
+- 결과 mp4 경로가 마지막 줄에 출력됩니다 (`storage/tasks/<작업id>/final-1.mp4`)
+- 초안만 보려면 `python -m app.ecozin.cli drafts --spec ...`
+
 ## 데이터 위치
 
 - `storage/ecozin/ecozin.db` — 프로젝트·초안·상태·이벤트 (SQLite)
