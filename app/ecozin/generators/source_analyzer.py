@@ -39,6 +39,7 @@ class Analysis:
     pain_hits: list[Any] = field(default_factory=list)
     cause_term: str = ""
     stage: str = "general"  # result(전후 숫자 있음) | baseline(설치 전 계측 중) | general
+    context: str = "consumer"  # consumer(요금 절감 현장) | generation(발전 현장: 손실·전력품질)
     assets: list[dict[str, Any]] = field(default_factory=list)
 
     @property
@@ -144,10 +145,15 @@ def analyze(source_text: str, source_notes: str, template: dict[str, Any], audie
         a.site = m.group(1).strip()
 
     for p in pains:
-        tokens = [t for t in re.findall(r"[가-힣]{2,}", pain_text(p)) if len(t) >= 2]
-        # 느슨한 매칭 방지: 앞 4개 토큰 중 2개 이상이 원본에 있어야 통점으로 본다
+        keywords = p.get("keywords") if isinstance(p, dict) else None
+        tokens = keywords or [t for t in re.findall(r"[가-힣]{2,}", pain_text(p)) if len(t) >= 2]
+        # 느슨한 매칭 방지: 키워드(또는 앞 4개 토큰) 중 2개 이상이 원본에 있어야 통점으로 본다
         if sum(1 for t in tokens[:4] if t in (source_text or "")) >= 2:
             a.pain_hits.append(p)
+    # 키워드가 명시된 통점(더 구체적)을 앞으로
+    a.pain_hits.sort(key=lambda p: 0 if isinstance(p, dict) and p.get("keywords") else 1)
+
+    a.context = "generation" if re.search(r"발전기|발전\s*단지|발전소|풍력|태양광", source_text or "") else "consumer"
 
     if a.has_before_after or a.percents:
         a.stage = "result"

@@ -50,7 +50,8 @@ def _values(project: Project, audience: dict[str, Any], analysis: Analysis, temp
     pain_q = pain_field(pain, "question") if pain else ""
     cause = analysis.cause_term or (template["vocabulary"].get("cause_terms") or ["역률"])[0]
     term = analysis.terms_found[0] if analysis.terms_found else (template["vocabulary"]["domain_terms"][0])
-    wrong = (audience.get("wrong_focus") or ["고지서"])[0]
+    ctx = (template.get("context_phrases") or {}).get(analysis.context, {})
+    wrong = ctx.get("wrong_focus") or (audience.get("wrong_focus") or ["고지서"])[0]
     audience_default = (audience.get("audience_defaults") or [""])[0]
     audience_short = project.target_audience if 0 < len(project.target_audience) <= 20 else audience_default
     return {
@@ -68,6 +69,9 @@ def _values(project: Project, audience: dict[str, Any], analysis: Analysis, temp
         "install_time": analysis.install_time or "",
         "n": _N,
         "cta": project.goal_cta,
+        "context": analysis.context,
+        "fix_fails": ctx.get("fix_fails", "설비를 바꿔도 요금은 안 내려갑니다"),
+        "result_word": ctx.get("result", "요금"),
     }
 
 
@@ -103,7 +107,7 @@ def _build_script(angle: dict[str, Any], mode: str, project: Project, audience: 
             p3 = f"{k1 or k2 or outcome + '이(가) 핵심입니다.'} 설치 후 계측 리포트가 나오니 고객 설득도 파트너가 아니라 숫자가 합니다."
         else:
             p1 = f"{v['pain_q']}, {v['wrong_focus']}만 {tone['ask']} 원인은 다른 데 있을 수 있습니다."
-            p2 = f"{v['cause']} 문제면 설비를 바꿔도 요금은 안 내려갑니다. {k0}"
+            p2 = f"{v['cause']} 문제면 {v['fix_fails']}. {k0}"
             p3 = f"{k1 or outcome + '이(가) 핵심입니다.'} 결과는 계측기로 찍어서 리포트로 드립니다."
     elif key == "before_after":
         if analysis.has_before_after:
@@ -121,6 +125,9 @@ def _build_script(angle: dict[str, Any], mode: str, project: Project, audience: 
             p3 = f"{k1 or '설치 전후 계측 리포트를 그대로 드립니다.'} 효과는 현장 조건에 따라 다르니 먼저 진단부터 받아보세요."
     elif key == "proof":
         site = v["site"] or "실증 현장"
+        # 실증형은 시간 순서가 중요: 계측기 설치 문장을 먼저, 실증 계획 문장을 다음에
+        ordered = sorted([s for s in (k0, k1, k2) if s], key=lambda s: 0 if re.search(r"계측기를?\s*(설치|달)", s) else 1)
+        k0, k1 = (ordered + ["", ""])[:2]
         if mode == "partner":
             p1 = f"{site} 실증 현장{tone['tell']}. 파트너가 팔기 전에 제조사가 먼저 증명합니다."
             p2 = k0 or "절감 장치를 달기 전에 계측기부터 설치해 설치 전 기준 데이터를 확보합니다."
@@ -228,7 +235,7 @@ def _video_prompt(angle: dict[str, Any], template: dict[str, Any], scenes: list[
 
 def _description(mode: str, project: Project, template: dict[str, Any], paragraphs: list[str], v: dict[str, str]) -> str:
     disclaimers = template.get("required_disclaimers", [])
-    tags = template.get("vocabulary", {}).get("hashtags", [])
+    tags = (template.get("context_phrases") or {}).get(v.get("context", "consumer"), {}).get("hashtags") or template.get("vocabulary", {}).get("hashtags", [])
     if mode == "partner":
         tags = tags[:2] + ["#대리점모집", "#설치파트너", "#전기공사"]
     body1 = paragraphs[0]
