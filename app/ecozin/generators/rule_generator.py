@@ -19,6 +19,8 @@ def _fill(pattern: str, values: dict[str, str]) -> str:
         key = m.group(1)
         return values.get(key, "")
     text = re.sub(r"\{(\w+)\}", rep, pattern)
+    text = re.sub(r"\s+([,，.])", r"\1", text)      # "전 , 후 ." 같은 빈 자리 흔적 정리
+    text = re.sub(r"([,，.]){2,}", r"\1", text)
     text = re.sub(r"\s{2,}", " ", text).strip()
     text = re.sub(r"^[,，.]\s*", "", text)
     return text
@@ -50,7 +52,7 @@ def _values(project: Project, audience: dict[str, Any], analysis: Analysis, temp
     term = analysis.terms_found[0] if analysis.terms_found else (template["vocabulary"]["domain_terms"][0])
     wrong = (audience.get("wrong_focus") or ["고지서"])[0]
     audience_default = (audience.get("audience_defaults") or [""])[0]
-    audience_short = project.target_audience if 0 < len(project.target_audience) <= 12 else audience_default
+    audience_short = project.target_audience if 0 < len(project.target_audience) <= 20 else audience_default
     return {
         "pain": pain_txt,
         "pain_short": pain_short,
@@ -117,6 +119,16 @@ def _build_script(angle: dict[str, Any], mode: str, project: Project, audience: 
             p1 = f"{site}{ba} 계측기 화면 그대로{tone['tell']}."
             p2 = f"{k0}" + (f" 설치는 {v['install_time']}, 생산 중단은 없었습니다." if v["install_time"] else "")
             p3 = f"{k1 or '설치 전후 계측 리포트를 그대로 드립니다.'} 효과는 현장 조건에 따라 다르니 먼저 진단부터 받아보세요."
+    elif key == "proof":
+        site = v["site"] or "실증 현장"
+        if mode == "partner":
+            p1 = f"{site} 실증 현장{tone['tell']}. 파트너가 팔기 전에 제조사가 먼저 증명합니다."
+            p2 = k0 or "절감 장치를 달기 전에 계측기부터 설치해 설치 전 기준 데이터를 확보합니다."
+            p3 = f"{k1 or '기준 데이터를 잡은 뒤 설치하고 같은 계측기로 전후를 비교합니다.'} 이 비교 리포트는 파트너 영업 자료로 그대로 드립니다."
+        else:
+            p1 = f"{site}, 절감 장치보다 계측기를 먼저 달았습니다."
+            p2 = k0 or "설치 전 기준 데이터를 먼저 확보합니다."
+            p3 = f"{k1 or '기준 데이터를 잡은 뒤 설치하고, 같은 계측기로 전후를 비교해 계측 리포트로 공개합니다.'} 절감률은 결과가 나온 뒤에 말하겠습니다."
     else:  # mistake
         if mode == "partner":
             p1 = f"절감기 대리점 계약 전에 꼭 확인할 {v['n']}가지{tone['tell']}."
@@ -159,6 +171,8 @@ def _scene_plan(angle: dict[str, Any], template: dict[str, Any], analysis: Analy
     image_assets = [a for a in analysis.assets if a.get("type") == "image"]
     screen_assets = [a for a in image_assets if classify_asset_visual(a) == "screen"]
     photo_assets = [a for a in image_assets if classify_asset_visual(a) == "photo"]
+    # 외관·전경 사진은 첫 장면(훅)에 가장 잘 어울리므로 앞으로 보낸다
+    photo_assets.sort(key=lambda a: 0 if any(k in f"{a.get('ref','')} {a.get('note','')}" for k in ("외관", "전경", "전체")) else 1)
     used: set[str] = set()
 
     def take(pool: list[dict[str, Any]]):
@@ -178,7 +192,9 @@ def _scene_plan(angle: dict[str, Any], template: dict[str, Any], analysis: Analy
         role = tpl["role"]
         default_visual = tpl.get("default_visual", "screen")
         asset = None
-        if role in ("hook", "cta"):
+        if role == "hook" and angle.get("hook_visual") == "photo":
+            asset = take(photo_assets) or take(screen_assets)
+        elif role in ("hook", "cta"):
             asset = take(screen_assets) or take(photo_assets)
         elif role == "solution":
             asset = take(photo_assets) or take(screen_assets)
@@ -232,7 +248,13 @@ def generate(project: Project, template: dict[str, Any], audience: dict[str, Any
     mode = project.audience_mode
     v = _values(project, audience, analysis, template)
     drafts: list[Draft] = []
-    for idx, angle in enumerate(template["angles"][:3]):
+    stage_map = template.get("stage_angles") or {}
+    wanted = stage_map.get(analysis.stage) or [a["key"] for a in template["angles"][:3]]
+    by_key = {a["key"]: a for a in template["angles"]}
+    angles = [by_key[k] for k in wanted if k in by_key][:3]
+    if len(angles) < 3:
+        angles = template["angles"][:3]
+    for idx, angle in enumerate(angles):
         key = angle["key"]
         hook = _pick_pattern(audience["hook_patterns"][key], v)
         paragraphs = _trim_script(_build_script(angle, mode, project, audience, analysis, template, v))

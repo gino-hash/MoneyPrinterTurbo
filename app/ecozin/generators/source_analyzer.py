@@ -17,7 +17,10 @@ _BEFORE_AFTER_PATTERNS = [
     re.compile(r"설치\s*전\s*([^,，.]{1,20}?)[,，]?\s*설치\s*후\s*([^,，.]{1,20})"),
 ]
 _INSTALL_TIME = re.compile(r"설치\s*(?:시간|소요)?\s*(?:은|는)?\s*(\d+\s*(?:시간|분|일))")
-_SITE = re.compile(r"((?:[가-힣]+(?:도|시|군|구)\s*)?[A-Za-z가-힣0-9]{1,12}(?:공장|빌딩|상가|농장|축사|센터|물류창고|창고|병원|학교|호텔|아파트|사업장|공단|현장))")
+_SITE = re.compile(
+    r"((?:[가-힣]{2,6}\s*)?(?:풍력|태양광|수력)?\s*발전\s*(?:단지|소)(?:\s*\d+호기)?"
+    r"|(?:[가-힣]+(?:도|시|군|구)\s*)?[A-Za-z가-힣0-9]{1,12}(?:공장|빌딩|상가|농장|축사|센터|물류창고|창고|병원|학교|호텔|아파트|사업장|공단|현장))")
+_BASELINE_HINT = re.compile(r"예정|실증|기준\s*데이터|설치\s*전\s*기준|계측을\s*시작|계측기를\s*설치|계측부터")
 _IMAGE_EXT = re.compile(r"\.(jpe?g|png|webp|gif|mp4|mov|mkv)$", re.I)
 _MEMO_LINE = re.compile(r"^\s*([^\s(（]+\.(?:jpe?g|png|webp|gif|mp4|mov|mkv))\s*[(（]?\s*([^)）]*)\s*[)）]?\s*$", re.I)
 
@@ -35,6 +38,7 @@ class Analysis:
     site: Optional[str] = None
     pain_hits: list[Any] = field(default_factory=list)
     cause_term: str = ""
+    stage: str = "general"  # result(전후 숫자 있음) | baseline(설치 전 계측 중) | general
     assets: list[dict[str, Any]] = field(default_factory=list)
 
     @property
@@ -141,8 +145,16 @@ def analyze(source_text: str, source_notes: str, template: dict[str, Any], audie
 
     for p in pains:
         tokens = [t for t in re.findall(r"[가-힣]{2,}", pain_text(p)) if len(t) >= 2]
-        if any(t in (source_text or "") for t in tokens[:3]):
+        # 느슨한 매칭 방지: 앞 4개 토큰 중 2개 이상이 원본에 있어야 통점으로 본다
+        if sum(1 for t in tokens[:4] if t in (source_text or "")) >= 2:
             a.pain_hits.append(p)
+
+    if a.has_before_after or a.percents:
+        a.stage = "result"
+    elif _BASELINE_HINT.search(source_text or ""):
+        a.stage = "baseline"
+    else:
+        a.stage = "general"
 
     cause_terms = list(template.get("vocabulary", {}).get("cause_terms", []))
     a.cause_term = next((c for c in cause_terms if c in (source_text or "")), cause_terms[0] if cause_terms else "")
@@ -164,6 +176,8 @@ def analyze(source_text: str, source_notes: str, template: dict[str, Any], audie
 def classify_asset_visual(asset: dict[str, Any]) -> str:
     """자산 메모로 화면 캡처인지 실사 사진인지 추정한다."""
     text = f"{asset.get('ref','')} {asset.get('note','')}".lower()
-    if any(k in text for k in ("계측", "meter", "화면", "screen", "그래프", "리포트", "report", "데이터", "표")):
+    if any(k in text for k in ("설치 중", "작업", "외관", "전경", "현장 사진", "엔지니어")):
+        return "photo"
+    if any(k in text for k in ("화면", "캡처", "screen", "그래프", "리포트", "report", "meter", "데이터")):
         return "screen"
     return "photo"
